@@ -166,16 +166,13 @@ mqtt:
             // Display this value for 5 seconds, then revert to clock
             id(g_display_until_ms) = millis() + 5000;
 
-# ── NTP time ──────────────────────────────────────────────────
+# ── Time ──────────────────────────────────────────────────────
+# Syncs from HA over the local API — fast, no internet needed.
 # Europe/London handles BST/GMT transitions automatically.
-# No manual changeover logic needed.
 time:
-  - platform: sntp
+  - platform: homeassistant
     id: sntp_time
     timezone: "Europe/London"
-    servers:
-      - 0.uk.pool.ntp.org
-      - 1.uk.pool.ntp.org
 
 # ── Global state ──────────────────────────────────────────────
 globals:
