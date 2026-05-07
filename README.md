@@ -62,7 +62,7 @@ python3 -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
 
 ### 3. Add to ESPHome dashboard
 
-If using the HA add-on: open ESPHome → **+ New device** → **Skip** (since you have the YAML already) → paste or upload `bigclock-esphome.yaml`. Make sure `secrets.yaml` is in the same directory as the config.
+Open ESPHome → **+ New device** → **Skip** → paste or upload `bigclock-esphome.yaml`. Make sure `secrets.yaml` is in the same directory.
 
 ### 4. First flash (USB)
 
@@ -76,56 +76,110 @@ Connect the XIAO via USB-C. ESPHome will compile, detect the port, and flash aut
 
 ### 5. Subsequent updates (OTA)
 
-Once the clock is on your network, all future updates go over WiFi:
-
 ```bash
 esphome run bigclock-esphome.yaml
 ```
 
 Or click **Install → Wirelessly** in the ESPHome dashboard.
 
-## MQTT — displaying external sensor values
+---
 
-The clock subscribes to `bigclock/display`. Publish any numeric string to it and the clock will display that value (as `XX °C`) for 5 seconds every 10-second cycle.
+## MQTT display messages
 
-**Example HA automation** (hot tub temperature):
+The clock shows the time by default. Publish a JSON message to `bigclock/display` and the clock immediately switches to showing that value for **5 seconds**, then reverts to the time automatically.
+
+### Message format
+
+```json
+{
+  "value": 22,
+  "format": "temp",
+  "color": "#FF6600",
+  "suffix_color": "#00CCFF"
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `value` | Yes | Integer to display. Send `-1` to cancel immediately. |
+| `format` | No | `"temp"` (default) → `XX °C`, clamped 0–99. `"number"` → `XXXX`, clamped 0–9999. |
+| `color` | No | Hex colour for the value digits. Defaults to white `#FFFFFF`. |
+| `suffix_color` | No | Hex colour for the `°C` suffix in temp mode. Defaults to `color`. |
+
+### Display modes
+
+**`"format": "temp"`** — two digits plus degree and C:
+```
+[ 2 ][ 2 ][ ° ][ C ]     value: 22
+```
+
+**`"format": "number"`** — four digits, full width:
+```
+[ 4 ][ 2 ][ 5 ][ 0 ]     value: 4250
+```
+
+### Sequencing multiple values
+
+An HA automation sends messages one at a time, with a 5-second delay between them. Each message gets its own 5-second slot on the clock face.
 
 ```yaml
-alias: Push hot tub temp to BigClock
+alias: BigClock — hot tub + solar display
 triggers:
-  - trigger: state
-    entity_id: sensor.hottub_temperature
+  - trigger: time_pattern
+    minutes: "/5"   # run every 5 minutes
 actions:
+  # Slide 1: hot tub temperature (orange digits, cyan °C)
   - action: mqtt.publish
     data:
       topic: bigclock/display
-      payload: "{{ states('sensor.hottub_temperature') }}"
+      payload: >
+        {"value": {{ states('sensor.hottub_temperature') | int }},
+         "format": "temp",
+         "color": "#FF6600",
+         "suffix_color": "#00CCFF"}
+
+  - delay: "00:00:05"
+
+  # Slide 2: solar generation in watts (yellow, 4-digit)
+  - action: mqtt.publish
+    data:
+      topic: bigclock/display
+      payload: >
+        {"value": {{ states('sensor.solar_power') | int }},
+         "format": "number",
+         "color": "#FFFF00"}
 ```
 
-The value is displayed floored to an integer (e.g. `22.75` → `22`), clamped to 0–99.
+The clock shows hot tub temp for 5 s, then solar watts for 5 s, then returns to the time. Add more `mqtt.publish` + `delay` pairs to show additional values.
 
-To clear the external value and return to time-only display, publish an empty string or a negative number:
+### Cancel early
+
+Send `{"value": -1}` to immediately clear any active overlay and return to the clock:
 
 ```yaml
 - action: mqtt.publish
   data:
     topic: bigclock/display
-    payload: "-1"
+    payload: '{"value": -1}'
 ```
+
+---
 
 ## MQTT topics
 
 | Topic | Direction | Description |
 |---|---|---|
 | `bigclock/availability` | publish | `online` / `offline` (retained) |
-| `bigclock/display` | subscribe | Float string to display (e.g. `"22.5"`) |
+| `bigclock/display` | subscribe | JSON display message (see above) |
 | `bigclock/light/hour_colour/command` | subscribe | HA light command (auto-managed) |
 | `bigclock/light/minute_colour/command` | subscribe | HA light command (auto-managed) |
 | `bigclock/light/downlight/command` | subscribe | HA light command (auto-managed) |
 | `bigclock/switch/rainbow_mode/command` | subscribe | `ON` / `OFF` |
 | `bigclock/button/randomise_colours/command` | subscribe | `PRESS` |
 
-All entity topics follow ESPHome's standard MQTT topic structure and are published via MQTT discovery — you don't need to configure them manually in HA.
+All entity topics follow ESPHome's standard MQTT topic structure and are created automatically via MQTT discovery.
+
+---
 
 ## Segment layout reference
 
@@ -145,8 +199,8 @@ ESPHome restores the last known state of the Hour Colour and Minute Colour light
 
 ## Extending
 
-**Add more display modes:** Add extra `addressable_lambda` effects to `clock_strip` and switch between them using automations or a `select` entity.
+**Add more display formats:** Extend `g_display_format` with new integer values and add corresponding rendering branches in the `Clock Display` lambda.
 
-**Display non-temperature values:** The `bigclock/display` topic accepts any integer 0–99. The `°C` suffix is hardcoded in the rendering lambda — edit `draw(10 ...)` / `draw(11 ...)` to change or remove it if you want to display other things.
+**Trigger from non-MQTT sources:** Any ESPHome action can set `g_display_value`, `g_display_format`, `g_display_r/g/b`, and `g_display_until_ms` directly via a `globals.set` / `lambda` action — no MQTT required.
 
 **Presets:** Create HA scenes that set Hour Colour and Minute Colour together, or use the Randomise button for instant variety.
