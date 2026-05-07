@@ -48,17 +48,27 @@ web_server:
   port: 80
 
 # ── MQTT ──────────────────────────────────────────────────────
-# ESPHome publishes MQTT discovery automatically, so all entities
+# ESPHome publishes MQTT discovery automatically — all entities
 # appear in HA via both the native API and MQTT.
 #
-# External display values:
-#   Publish a numeric string to  bigclock/display  to show it on
-#   the clock for 5 s every 10 s cycle.
-#   Example from an HA automation:
-#     action: mqtt.publish
-#     data:
-#       topic: bigclock/display
-#       payload: "{{ states('sensor.hottub_temperature') }}"
+# ── Display messages ──────────────────────────────────────────
+# Publish a JSON payload to  bigclock/display  to show a value
+# on the clock for 5 seconds, then it returns to showing the time.
+#
+# An HA automation can send multiple messages in sequence — each
+# one gets 5 seconds. The automation controls pacing by inserting
+# a 5 s delay between publishes.
+#
+# Message format:
+#   {
+#     "value": 22,              ← integer to display (required)
+#     "format": "temp",         ← "temp"   → XX °C  (0–99)
+#                                  "number" → XXXX   (0–9999)
+#     "color": "#FF6600",       ← hex colour for the value digits (optional, default white)
+#     "suffix_color": "#00CCFF" ← hex colour for °C in temp mode  (optional, defaults to color)
+#   }
+#
+# Send value -1 to cancel any active display and return to the clock immediately.
 mqtt:
   broker: !secret mqtt_host
   port: 1883
@@ -79,10 +89,84 @@ mqtt:
     - topic: ${device_name}/display
       then:
         - lambda: |-
-            id(g_external_value) = atof(x.c_str());
+            const char* json = x.c_str();
+
+            // Extract an integer field — returns -32767 if key not found
+            auto get_int = [](const char* j, const char* key) -> int {
+              char search[32];
+              snprintf(search, sizeof(search), "\"%s\":", key);
+              const char* p = strstr(j, search);
+              if (!p) return -32767;
+              p += strlen(search);
+              while (*p == ' ') p++;
+              return atoi(p);
+            };
+
+            // Extract a quoted string field into a fixed buffer
+            auto get_str = [](const char* j, const char* key, char* out, int n) -> bool {
+              char search[32];
+              snprintf(search, sizeof(search), "\"%s\":\"", key);
+              const char* p = strstr(j, search);
+              if (!p) return false;
+              p += strlen(search);
+              int i = 0;
+              while (*p && *p != '"' && i < n - 1) out[i++] = *p++;
+              out[i] = 0;
+              return i > 0;
+            };
+
+            // Parse a "#RRGGBB" hex colour string into r/g/b components
+            auto parse_hex = [](const char* s, int* r, int* g, int* b) -> bool {
+              if (!s || s[0] != '#' || strlen(s) != 7) return false;
+              long v = strtol(s + 1, nullptr, 16);
+              *r = (v >> 16) & 0xFF;
+              *g = (v >>  8) & 0xFF;
+              *b =  v        & 0xFF;
+              return true;
+            };
+
+            int val = get_int(json, "value");
+
+            // No "value" field — ignore
+            if (val == -32767) return;
+
+            // Negative value = cancel, return to clock immediately
+            if (val < 0) {
+              id(g_display_until_ms) = 0;
+              return;
+            }
+
+            char fmt_buf[16]  = "temp";
+            char col_buf[8]   = "#FFFFFF";
+            char scol_buf[8]  = "";
+
+            get_str(json, "format",       fmt_buf,  sizeof(fmt_buf));
+            get_str(json, "color",        col_buf,  sizeof(col_buf));
+            get_str(json, "suffix_color", scol_buf, sizeof(scol_buf));
+
+            // format: "number" → XXXX (0–9999), anything else → XX °C (0–99)
+            id(g_display_value)  = val;
+            id(g_display_format) = (strncmp(fmt_buf, "number", 6) == 0) ? 2 : 1;
+
+            // Primary colour (white if not provided / invalid)
+            int pr = 255, pg = 255, pb = 255;
+            parse_hex(col_buf, &pr, &pg, &pb);
+            id(g_display_r) = pr;
+            id(g_display_g) = pg;
+            id(g_display_b) = pb;
+
+            // Suffix colour for °C — falls back to primary colour
+            int sr = pr, sg = pg, sb = pb;
+            if (scol_buf[0] == '#') parse_hex(scol_buf, &sr, &sg, &sb);
+            id(g_display_suffix_r) = sr;
+            id(g_display_suffix_g) = sg;
+            id(g_display_suffix_b) = sb;
+
+            // Display this value for 5 seconds, then revert to clock
+            id(g_display_until_ms) = millis() + 5000;
 
 # ── NTP time ──────────────────────────────────────────────────
-# Europe/London POSIX timezone string handles BST/GMT automatically.
+# Europe/London handles BST/GMT transitions automatically.
 # No manual changeover logic needed.
 time:
   - platform: sntp
@@ -123,21 +207,55 @@ globals:
     restore_value: no
     initial_value: '0'
 
-  # External value received via MQTT (negative = nothing received yet)
-  - id: g_external_value
-    type: float
-    restore_value: no
-    initial_value: '-1.0'
+  # ── Display overlay state ──────────────────────────────────
+  # When millis() < g_display_until_ms the clock shows the overlay
+  # value instead of the time. Each MQTT message sets a fresh 5 s window.
 
-  # Display cycling: true while showing the external value
-  - id: g_showing_external
-    type: bool
-    restore_value: no
-    initial_value: 'false'
-  - id: g_cycle_start_ms
+  # Timestamp (ms) at which to revert to showing the time
+  - id: g_display_until_ms
     type: uint32_t
     restore_value: no
     initial_value: '0'
+
+  # Value to display
+  - id: g_display_value
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  # Display format: 1 = temp (XX °C, 0–99)  |  2 = number (XXXX, 0–9999)
+  - id: g_display_format
+    type: int
+    restore_value: no
+    initial_value: '1'
+
+  # Colour for the value digits
+  - id: g_display_r
+    type: int
+    restore_value: no
+    initial_value: '255'
+  - id: g_display_g
+    type: int
+    restore_value: no
+    initial_value: '255'
+  - id: g_display_b
+    type: int
+    restore_value: no
+    initial_value: '255'
+
+  # Colour for the °C suffix (temp mode only)
+  - id: g_display_suffix_r
+    type: int
+    restore_value: no
+    initial_value: '255'
+  - id: g_display_suffix_g
+    type: int
+    restore_value: no
+    initial_value: '255'
+  - id: g_display_suffix_b
+    type: int
+    restore_value: no
+    initial_value: '255'
 
   # Auto-brightness from LDR (0.08 = dimmest, 1.0 = full)
   - id: g_brightness
@@ -178,8 +296,8 @@ sensor:
 # ── Virtual outputs for colour storage ────────────────────────
 # ESPHome's rgb light platform writes float values (0.0–1.0) to
 # these outputs when HA changes the hour or minute colour.
-# We convert and store them as 0–255 integers in globals so the
-# rendering lambda can read them without driving any physical LEDs.
+# We store them as 0–255 integers so the rendering lambda can use
+# them without driving any physical LEDs directly.
 output:
   - platform: template
     id: out_hour_r
@@ -219,8 +337,6 @@ light:
   # Virtual RGB light → hour digit colour.
   # HA shows this as a standard colour picker. Changes flow through
   # the template outputs above into the g_hour_r/g/b globals.
-  # The brightness slider also works — LDR auto-brightness is
-  # applied on top of this in the rendering lambda.
   - platform: rgb
     name: "Hour Colour"
     id: hour_colour
@@ -242,7 +358,7 @@ light:
 
   # Physical clock digit strip.
   # Marked internal — HA does not control this directly.
-  # All rendering is handled by the addressable_lambda effect below.
+  # All rendering is done by the addressable_lambda effect below.
   # GPIO5 = D3 on XIAO ESP32-C3
   # 252 LEDs = 4 digits × 7 segments × 9 LEDs per segment
   - platform: esp32_rmt_led_strip
@@ -259,8 +375,11 @@ light:
 
       # ── Clock Display ─────────────────────────────────────
       # Updates every second.
-      # Shows time normally; when an external value has been
-      # received via MQTT it cycles 10 s time → 5 s value.
+      #
+      # Default: shows the current local time (HH MM).
+      # When a display message has been received via MQTT it shows
+      # that value instead until the 5 s window expires, then
+      # reverts to the time automatically.
       #
       # Segment pixel layout (63 pixels per digit, 9 per segment):
       #   pixels  0– 8  right-top vertical
@@ -285,7 +404,7 @@ light:
               }
             };
 
-            // Render one 7-segment character at pixel base with colour c.
+            // Render one 7-segment character at pixel base with colour c
             // digit 10 = degree symbol °
             // digit 11 = letter C
             auto draw = [&](int digit, int base, Color c) {
@@ -309,41 +428,43 @@ light:
               }
             };
 
-            // Display cycling logic
-            uint32_t now_ms = millis();
-            if (id(g_external_value) >= 0.0f) {
-              uint32_t elapsed = now_ms - id(g_cycle_start_ms);
-              if (!id(g_showing_external) && elapsed >= 10000) {
-                id(g_showing_external) = true;
-                id(g_cycle_start_ms) = now_ms;
-              } else if (id(g_showing_external) && elapsed >= 5000) {
-                id(g_showing_external) = false;
-                id(g_cycle_start_ms) = now_ms;
-              }
-            }
-
-            // Compute display colours with LDR brightness applied
             float br = id(g_brightness);
-            Color col_h((uint8_t)(id(g_hour_r) * br),
-                        (uint8_t)(id(g_hour_g) * br),
-                        (uint8_t)(id(g_hour_b) * br));
-            Color col_m((uint8_t)(id(g_min_r) * br),
-                        (uint8_t)(id(g_min_g) * br),
-                        (uint8_t)(id(g_min_b) * br));
-
             it.all() = Color(0, 0, 0);
 
-            if (id(g_showing_external)) {
-              // Display external value as  XX °C
-              int val = (int) id(g_external_value);
-              if (val < 0)  val = 0;
-              if (val > 99) val = 99;
-              draw(val / 10, 189, col_h);
-              draw(val % 10, 126, col_h);
-              draw(10,        63, col_m);  // °
-              draw(11,         0, col_m);  // C
+            if (millis() < id(g_display_until_ms)) {
+              // ── Show MQTT overlay value ──────────────────
+              Color col_v((uint8_t)(id(g_display_r)        * br),
+                          (uint8_t)(id(g_display_g)        * br),
+                          (uint8_t)(id(g_display_b)        * br));
+              Color col_s((uint8_t)(id(g_display_suffix_r) * br),
+                          (uint8_t)(id(g_display_suffix_g) * br),
+                          (uint8_t)(id(g_display_suffix_b) * br));
+              int val = id(g_display_value);
+
+              if (id(g_display_format) == 2) {
+                // Number mode: XXXX  (0–9999)
+                int v = val < 0 ? 0 : (val > 9999 ? 9999 : val);
+                draw( v / 1000,        189, col_v);
+                draw((v /  100) % 10,  126, col_v);
+                draw((v /   10) % 10,   63, col_v);
+                draw( v         % 10,    0, col_v);
+              } else {
+                // Temp mode: XX °C  (0–99)
+                int v = val < 0 ? 0 : (val > 99 ? 99 : val);
+                draw(v / 10, 189, col_v);
+                draw(v % 10, 126, col_v);
+                draw(10,      63, col_s);  // °
+                draw(11,       0, col_s);  // C
+              }
+
             } else {
-              // Display current local time (BST/GMT handled by timezone)
+              // ── Show current local time ──────────────────
+              Color col_h((uint8_t)(id(g_hour_r) * br),
+                          (uint8_t)(id(g_hour_g) * br),
+                          (uint8_t)(id(g_hour_b) * br));
+              Color col_m((uint8_t)(id(g_min_r)  * br),
+                          (uint8_t)(id(g_min_g)  * br),
+                          (uint8_t)(id(g_min_b)  * br));
               auto t = id(sntp_time).now();
               if (t.is_valid()) {
                 draw(t.hour   / 10, 189, col_h);
