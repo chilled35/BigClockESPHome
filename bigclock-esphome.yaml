@@ -25,7 +25,7 @@ logger:
 # ── OTA ───────────────────────────────────────────────────────
 ota:
   - platform: esphome
-    password: ""
+    password: !secret ota_password
 
 # ── WiFi ──────────────────────────────────────────────────────
 wifi:
