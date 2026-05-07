@@ -370,6 +370,9 @@ light:
     num_leds: 252
     type: GRB
     variant: WS2812
+    method:
+      type: esp32_rmt
+      channel: 0
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
@@ -492,6 +495,9 @@ light:
     num_leds: 14
     type: GRB
     variant: WS2812
+    method:
+      type: esp32_rmt
+      channel: 1
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
