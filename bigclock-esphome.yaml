@@ -1,0 +1,416 @@
+substitutions:
+  device_name: bigclock
+  friendly_name: "Big Clock"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    # Start the clock display effect after everything is initialised
+    priority: -100.0
+    then:
+      - light.turn_on:
+          id: clock_strip
+          effect: "Clock Display"
+
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: arduino
+
+# ── Logging ───────────────────────────────────────────────────
+logger:
+  level: INFO
+
+# ── OTA ───────────────────────────────────────────────────────
+ota:
+  - platform: esphome
+    password: ""
+
+# ── WiFi ──────────────────────────────────────────────────────
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Setup"
+    password: !secret fallback_password
+
+captive_portal:
+
+# ── Home Assistant native API ─────────────────────────────────
+api:
+  encryption:
+    key: !secret api_key
+
+# ── Web UI ────────────────────────────────────────────────────
+# Accessible at http://bigclock.local after first flash
+web_server:
+  port: 80
+
+# ── MQTT ──────────────────────────────────────────────────────
+# ESPHome publishes MQTT discovery automatically, so all entities
+# appear in HA via both the native API and MQTT.
+#
+# External display values:
+#   Publish a numeric string to  bigclock/display  to show it on
+#   the clock for 5 s every 10 s cycle.
+#   Example from an HA automation:
+#     action: mqtt.publish
+#     data:
+#       topic: bigclock/display
+#       payload: "{{ states('sensor.hottub_temperature') }}"
+mqtt:
+  broker: !secret mqtt_host
+  port: 1883
+  username: !secret mqtt_user
+  password: !secret mqtt_pass
+  client_id: ${device_name}
+  discovery: true
+  discovery_prefix: homeassistant
+  birth_message:
+    topic: ${device_name}/availability
+    payload: "online"
+    retain: true
+  will_message:
+    topic: ${device_name}/availability
+    payload: "offline"
+    retain: true
+  on_message:
+    - topic: ${device_name}/display
+      then:
+        - lambda: |-
+            id(g_external_value) = atof(x.c_str());
+
+# ── NTP time ──────────────────────────────────────────────────
+# Europe/London POSIX timezone string handles BST/GMT automatically.
+# No manual changeover logic needed.
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "Europe/London"
+    servers:
+      - 0.uk.pool.ntp.org
+      - 1.uk.pool.ntp.org
+
+# ── Global state ──────────────────────────────────────────────
+globals:
+  # Hour-digit colour (0–255 per channel).
+  # Written by the virtual hour_colour light entity when HA changes colour.
+  - id: g_hour_r
+    type: int
+    restore_value: no
+    initial_value: '255'
+  - id: g_hour_g
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: g_hour_b
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  # Minute-digit colour
+  - id: g_min_r
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: g_min_g
+    type: int
+    restore_value: no
+    initial_value: '255'
+  - id: g_min_b
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  # External value received via MQTT (negative = nothing received yet)
+  - id: g_external_value
+    type: float
+    restore_value: no
+    initial_value: '-1.0'
+
+  # Display cycling: true while showing the external value
+  - id: g_showing_external
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: g_cycle_start_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
+  # Auto-brightness from LDR (0.08 = dimmest, 1.0 = full)
+  - id: g_brightness
+    type: float
+    restore_value: no
+    initial_value: '1.0'
+
+  # Rainbow mode state (mirrors the switch entity)
+  - id: g_rainbow
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+# ── Light sensor (LDR) ────────────────────────────────────────
+# GPIO2 = A0 on XIAO ESP32-C3
+# Brighter room → higher ADC voltage → dimmer LEDs (avoids glare)
+sensor:
+  - platform: adc
+    pin: GPIO2
+    id: ldr_sensor
+    name: "Ambient Light"
+    update_interval: 500ms
+    attenuation: auto
+    filters:
+      - sliding_window_moving_average:
+          window_size: 8
+          send_every: 1
+    on_value:
+      then:
+        - lambda: |-
+            // x = averaged ADC voltage (0.0–3.3 V)
+            // Map: dark (0 V) → brightness 1.0, bright (3.3 V) → brightness 0.08
+            float br = 1.0f - (x / 3.3f) * 0.92f;
+            if (br < 0.08f) br = 0.08f;
+            if (br > 1.0f)  br = 1.0f;
+            id(g_brightness) = br;
+
+# ── Virtual outputs for colour storage ────────────────────────
+# ESPHome's rgb light platform writes float values (0.0–1.0) to
+# these outputs when HA changes the hour or minute colour.
+# We convert and store them as 0–255 integers in globals so the
+# rendering lambda can read them without driving any physical LEDs.
+output:
+  - platform: template
+    id: out_hour_r
+    type: float
+    write_action:
+      - lambda: id(g_hour_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_hour_g
+    type: float
+    write_action:
+      - lambda: id(g_hour_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_hour_b
+    type: float
+    write_action:
+      - lambda: id(g_hour_b) = (int)(state * 255.0f);
+
+  - platform: template
+    id: out_min_r
+    type: float
+    write_action:
+      - lambda: id(g_min_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_min_g
+    type: float
+    write_action:
+      - lambda: id(g_min_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_min_b
+    type: float
+    write_action:
+      - lambda: id(g_min_b) = (int)(state * 255.0f);
+
+# ── Lights ────────────────────────────────────────────────────
+light:
+
+  # Virtual RGB light → hour digit colour.
+  # HA shows this as a standard colour picker. Changes flow through
+  # the template outputs above into the g_hour_r/g/b globals.
+  # The brightness slider also works — LDR auto-brightness is
+  # applied on top of this in the rendering lambda.
+  - platform: rgb
+    name: "Hour Colour"
+    id: hour_colour
+    red: out_hour_r
+    green: out_hour_g
+    blue: out_hour_b
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  # Virtual RGB light → minute digit colour
+  - platform: rgb
+    name: "Minute Colour"
+    id: min_colour
+    red: out_min_r
+    green: out_min_g
+    blue: out_min_b
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  # Physical clock digit strip.
+  # Marked internal — HA does not control this directly.
+  # All rendering is handled by the addressable_lambda effect below.
+  # GPIO5 = D3 on XIAO ESP32-C3
+  # 252 LEDs = 4 digits × 7 segments × 9 LEDs per segment
+  - platform: esp32_rmt_led_strip
+    id: clock_strip
+    name: "Clock Strip"
+    internal: true
+    pin: GPIO5
+    num_leds: 252
+    chipset: WS2812
+    rgb_order: GRB
+    default_transition_length: 0s
+    restore_mode: ALWAYS_OFF
+    effects:
+
+      # ── Clock Display ─────────────────────────────────────
+      # Updates every second.
+      # Shows time normally; when an external value has been
+      # received via MQTT it cycles 10 s time → 5 s value.
+      #
+      # Segment pixel layout (63 pixels per digit, 9 per segment):
+      #   pixels  0– 8  right-top vertical
+      #   pixels  9–17  top horizontal
+      #   pixels 18–26  left-top vertical
+      #   pixels 27–35  middle horizontal
+      #   pixels 36–44  right-bottom vertical
+      #   pixels 45–53  left-bottom vertical
+      #   pixels 54–62  bottom horizontal
+      #
+      # Digit pixel bases:
+      #   hours tens = 189 | hours units = 126
+      #   mins  tens =  63 | mins  units =   0
+      - addressable_lambda:
+          name: "Clock Display"
+          update_interval: 1s
+          lambda: |-
+            // Fill pixels [base+start .. base+start+len-1] with colour c
+            auto seg = [&](int base, int start, int len, Color c) {
+              for (int i = base + start; i < base + start + len; i++) {
+                if (i >= 0 && i < 252) it[i] = c;
+              }
+            };
+
+            // Render one 7-segment character at pixel base with colour c.
+            // digit 10 = degree symbol °
+            // digit 11 = letter C
+            auto draw = [&](int digit, int base, Color c) {
+              switch (digit) {
+                case 0:  seg(base, 0,27,c); seg(base,36,27,c); break;
+                case 1:  seg(base, 0, 9,c); seg(base,36, 9,c); break;
+                case 2:  seg(base, 0,18,c); seg(base,27, 9,c); seg(base,45,18,c); break;
+                case 3:  seg(base, 0,18,c); seg(base,27,27,c); break;
+                case 4:  seg(base, 0, 9,c); seg(base,18,27,c); break;
+                case 5:  seg(base, 9,45,c); break;
+                case 6:  seg(base, 9,54,c); break;
+                case 7:  seg(base, 0,18,c); seg(base,36, 9,c); break;
+                case 8:  seg(base, 0,63,c); break;
+                case 9:  seg(base, 0,45,c); break;
+                case 10: // ° degree
+                  seg(base, 0,9,c); seg(base, 9,9,c);
+                  seg(base,18,9,c); seg(base,27,9,c); break;
+                case 11: // C
+                  seg(base, 9,9,c); seg(base,18,9,c);
+                  seg(base,45,9,c); seg(base,54,9,c); break;
+              }
+            };
+
+            // Display cycling logic
+            uint32_t now_ms = millis();
+            if (id(g_external_value) >= 0.0f) {
+              uint32_t elapsed = now_ms - id(g_cycle_start_ms);
+              if (!id(g_showing_external) && elapsed >= 10000) {
+                id(g_showing_external) = true;
+                id(g_cycle_start_ms) = now_ms;
+              } else if (id(g_showing_external) && elapsed >= 5000) {
+                id(g_showing_external) = false;
+                id(g_cycle_start_ms) = now_ms;
+              }
+            }
+
+            // Compute display colours with LDR brightness applied
+            float br = id(g_brightness);
+            Color col_h((uint8_t)(id(g_hour_r) * br),
+                        (uint8_t)(id(g_hour_g) * br),
+                        (uint8_t)(id(g_hour_b) * br));
+            Color col_m((uint8_t)(id(g_min_r) * br),
+                        (uint8_t)(id(g_min_g) * br),
+                        (uint8_t)(id(g_min_b) * br));
+
+            it.all() = Color(0, 0, 0);
+
+            if (id(g_showing_external)) {
+              // Display external value as  XX °C
+              int val = (int) id(g_external_value);
+              if (val < 0)  val = 0;
+              if (val > 99) val = 99;
+              draw(val / 10, 189, col_h);
+              draw(val % 10, 126, col_h);
+              draw(10,        63, col_m);  // °
+              draw(11,         0, col_m);  // C
+            } else {
+              // Display current local time (BST/GMT handled by timezone)
+              auto t = id(sntp_time).now();
+              if (t.is_valid()) {
+                draw(t.hour   / 10, 189, col_h);
+                draw(t.hour   % 10, 126, col_h);
+                draw(t.minute / 10,  63, col_m);
+                draw(t.minute % 10,   0, col_m);
+              }
+            }
+
+      # ── Rainbow ───────────────────────────────────────────
+      # Sweeps a rainbow wave across all 252 pixels.
+      # Toggle via the "Rainbow Mode" switch in HA or MQTT.
+      - addressable_rainbow:
+          name: "Rainbow"
+          speed: 10
+          width: 50
+
+  # Physical downlight strip — exposed to HA as a full RGB light.
+  # GPIO4 = D2 on XIAO ESP32-C3 | 14 LEDs
+  - platform: esp32_rmt_led_strip
+    id: down_strip
+    name: "Downlight"
+    pin: GPIO4
+    num_leds: 14
+    chipset: WS2812
+    rgb_order: GRB
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+# ── Rainbow mode switch ───────────────────────────────────────
+switch:
+  - platform: template
+    name: "Rainbow Mode"
+    id: rainbow_switch
+    restore_mode: RESTORE_DEFAULT_OFF
+    lambda: return id(g_rainbow);
+    turn_on_action:
+      - globals.set:
+          id: g_rainbow
+          value: 'true'
+      - light.turn_on:
+          id: clock_strip
+          effect: "Rainbow"
+    turn_off_action:
+      - globals.set:
+          id: g_rainbow
+          value: 'false'
+      - light.turn_on:
+          id: clock_strip
+          effect: "Clock Display"
+
+# ── Randomise colours button ──────────────────────────────────
+button:
+  - platform: template
+    name: "Randomise Colours"
+    on_press:
+      - lambda: |-
+          id(g_hour_r) = random(256);
+          id(g_hour_g) = random(256);
+          id(g_hour_b) = random(256);
+          id(g_min_r)  = random(256);
+          id(g_min_g)  = random(256);
+          id(g_min_b)  = random(256);
+          // Sync new values back into the HA light entities
+          auto ch = id(hour_colour).turn_on();
+          ch.set_rgb(id(g_hour_r)/255.0f, id(g_hour_g)/255.0f, id(g_hour_b)/255.0f);
+          ch.perform();
+          auto cm = id(min_colour).turn_on();
+          cm.set_rgb(id(g_min_r)/255.0f, id(g_min_g)/255.0f, id(g_min_b)/255.0f);
+          cm.perform();
