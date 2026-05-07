@@ -12,6 +12,9 @@ esphome:
       - light.turn_on:
           id: clock_strip
           effect: "Clock Display"
+      - light.turn_on:
+          id: down_strip
+          effect: "Downlight Display"
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -21,6 +24,7 @@ esp32:
 # ── Logging ───────────────────────────────────────────────────
 logger:
   level: DEBUG
+  
 
 # ── OTA ───────────────────────────────────────────────────────
 ota:
@@ -49,8 +53,8 @@ web_server:
   port: 80
 
 # ── MQTT ──────────────────────────────────────────────────────
-# Used only for receiving display messages on bigclock/display.
-# discovery: false — HA entities are provided by the native API above.
+# ESPHome publishes MQTT discovery automatically — all entities
+# appear in HA via both the native API and MQTT.
 #
 # ── Display messages ──────────────────────────────────────────
 # Publish a JSON payload to  bigclock/display  to show a value
@@ -266,6 +270,20 @@ globals:
     restore_value: no
     initial_value: 'false'
 
+  # Downlight colour requested by HA (brightness baked in, 0–255 per channel)
+  - id: g_down_r
+    type: int
+    restore_value: no
+    initial_value: '255'
+  - id: g_down_g
+    type: int
+    restore_value: no
+    initial_value: '255'
+  - id: g_down_b
+    type: int
+    restore_value: no
+    initial_value: '255'
+
 # ── Light sensor (LDR) ────────────────────────────────────────
 # GPIO2 = A0 on XIAO ESP32-C3
 # Brighter room → higher ADC voltage → dimmer LEDs (avoids glare)
@@ -327,6 +345,22 @@ output:
     type: float
     write_action:
       - lambda: id(g_min_b) = (int)(state * 255.0f);
+
+  - platform: template
+    id: out_down_r
+    type: float
+    write_action:
+      - lambda: id(g_down_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_down_g
+    type: float
+    write_action:
+      - lambda: id(g_down_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_down_b
+    type: float
+    write_action:
+      - lambda: id(g_down_b) = (int)(state * 255.0f);
 
 # ── Lights ────────────────────────────────────────────────────
 light:
@@ -482,11 +516,13 @@ light:
           speed: 10
           width: 50
 
-  # Physical downlight strip — exposed to HA as a full RGB light.
+  # Physical downlight strip — internal, driven by the Downlight Display effect
+  # which applies LDR ambient brightness scaling (g_brightness).
   # GPIO4 = D2 on XIAO ESP32-C3 | 14 LEDs
   - platform: neopixelbus
     id: down_strip
-    name: "Downlight"
+    name: "Downlight Strip"
+    internal: true
     pin: GPIO4
     num_leds: 14
     type: GRB
@@ -494,6 +530,29 @@ light:
     method:
       type: esp32_rmt
       channel: 1
+    default_transition_length: 0s
+    restore_mode: ALWAYS_OFF
+    effects:
+      - addressable_lambda:
+          name: "Downlight Display"
+          update_interval: 200ms
+          lambda: |-
+            float br = id(g_brightness);
+            it.all() = Color(
+              (uint8_t)(id(g_down_r) * br),
+              (uint8_t)(id(g_down_g) * br),
+              (uint8_t)(id(g_down_b) * br)
+            );
+
+  # Virtual RGB light — HA controls colour/brightness through this entity.
+  # Values are written into g_down_r/g/b via template outputs;
+  # the Downlight Display effect applies LDR scaling (g_brightness) on top.
+  - platform: rgb
+    name: "Downlight"
+    id: down_control
+    red: out_down_r
+    green: out_down_g
+    blue: out_down_b
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
