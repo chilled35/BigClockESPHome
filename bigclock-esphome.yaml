@@ -522,12 +522,12 @@ button:
     name: "Randomise Colours"
     on_press:
       - lambda: |-
-          id(g_hour_r) = random(256);
-          id(g_hour_g) = random(256);
-          id(g_hour_b) = random(256);
-          id(g_min_r)  = random(256);
-          id(g_min_g)  = random(256);
-          id(g_min_b)  = random(256);
+          id(g_hour_r) = rand() % 256;
+          id(g_hour_g) = rand() % 256;
+          id(g_hour_b) = rand() % 256;
+          id(g_min_r)  = rand() % 256;
+          id(g_min_g)  = rand() % 256;
+          id(g_min_b)  = rand() % 256;
           // Sync new values back into the HA light entities
           auto ch = id(hour_colour).turn_on();
           ch.set_rgb(id(g_hour_r)/255.0f, id(g_hour_g)/255.0f, id(g_hour_b)/255.0f);
