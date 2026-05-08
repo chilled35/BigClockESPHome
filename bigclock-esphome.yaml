@@ -21,17 +21,17 @@ esp32:
   framework:
     type: arduino
 
-# ── Logging ───────────────────────────────────────────────────
+# ── Logging ─────────────────────────────────────────────
 logger:
   level: WARN
   
 
-# ── OTA ───────────────────────────────────────────────────────
+# ── OTA ─────────────────────────────────────────────
 ota:
   - platform: esphome
     password: !secret ota_password
 
-# ── WiFi ──────────────────────────────────────────────────────
+# ── WiFi ────────────────────────────────────────────
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
@@ -46,21 +46,21 @@ wifi:
 
 captive_portal:
 
-# ── Home Assistant native API ─────────────────────────────────
+# ── Home Assistant native API ─────────────────────────
 api:
   encryption:
     key: !secret api_key
 
-# ── Web UI ────────────────────────────────────────────────────
+# ── Web UI ────────────────────────────────────────────
 # Accessible at http://bigclock.local after first flash
 web_server:
   port: 80
 
-# ── MQTT ──────────────────────────────────────────────────────
+# ── MQTT ────────────────────────────────────────────
 # ESPHome publishes MQTT discovery automatically — all entities
 # appear in HA via both the native API and MQTT.
 #
-# ── Display messages ──────────────────────────────────────────
+# ── Display messages ──────────────────────────────
 # Publish a JSON payload to  bigclock/display  to show a value
 # on the clock for 5 seconds, then it returns to showing the time.
 #
@@ -145,6 +145,7 @@ mqtt:
             // Negative value = cancel, return to clock immediately
             if (val < 0) {
               id(g_display_until_ms) = 0;
+              id(g_dirty) = true;
               return;
             }
 
@@ -176,16 +177,22 @@ mqtt:
 
             // Display this value for 5 seconds, then revert to clock
             id(g_display_until_ms) = millis() + 5000;
+            id(g_dirty) = true;
 
-# ── Time ──────────────────────────────────────────────────────
+# ── Time ──────────────────────────────────────────────
 # Syncs from HA over the local API — fast, no internet needed.
 # Europe/London handles BST/GMT transitions automatically.
 time:
   - platform: homeassistant
     id: sntp_time
     timezone: "Europe/London"
+    on_time:
+      - seconds: 0
+        minutes: /1
+        then:
+          - lambda: id(g_dirty) = true;
 
-# ── Global state ──────────────────────────────────────────────
+# ── Global state ──────────────────────────────────────────
 globals:
   # Hour-digit colour (0–255 per channel).
   # Written by the virtual hour_colour light entity when HA changes colour.
@@ -216,7 +223,7 @@ globals:
     restore_value: no
     initial_value: '0'
 
-  # ── Display overlay state ──────────────────────────────────
+  # ── Display overlay state ──────────────────────────
   # When millis() < g_display_until_ms the clock shows the overlay
   # value instead of the time. Each MQTT message sets a fresh 5 s window.
 
@@ -266,6 +273,18 @@ globals:
     restore_value: no
     initial_value: '255'
 
+  # Set true whenever the display needs redrawing; cleared after each render
+  - id: g_dirty
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+
+  # Tracks whether the overlay was active on the last render (for expiry detection)
+  - id: g_display_was_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
   # Auto-brightness from LDR (0.08 = dimmest, 1.0 = full)
   - id: g_brightness
     type: float
@@ -292,7 +311,7 @@ globals:
     restore_value: no
     initial_value: '255'
 
-# ── Light sensor (LDR) ────────────────────────────────────────
+# ── Light sensor (LDR) ────────────────────────────────
 # GPIO2 = A0 on XIAO ESP32-C3
 # Brighter room → higher ADC voltage → dimmer LEDs (avoids glare)
 sensor:
@@ -316,8 +335,9 @@ sensor:
             if (br < 0.08f) br = 0.08f;
             if (br > 1.0f)  br = 1.0f;
             id(g_brightness) = br;
+            id(g_dirty) = true;
 
-# ── Virtual outputs for colour storage ────────────────────────
+# ── Virtual outputs for colour storage ────────────────────
 # ESPHome's rgb light platform writes float values (0.0–1.0) to
 # these outputs when HA changes the hour or minute colour.
 # We store them as 0–255 integers so the rendering lambda can use
@@ -327,33 +347,45 @@ output:
     id: out_hour_r
     type: float
     write_action:
-      - lambda: id(g_hour_r) = (int)(state * 255.0f);
+      - lambda: |-
+          id(g_hour_r) = (int)(state * 255.0f);
+          id(g_dirty) = true;
   - platform: template
     id: out_hour_g
     type: float
     write_action:
-      - lambda: id(g_hour_g) = (int)(state * 255.0f);
+      - lambda: |-
+          id(g_hour_g) = (int)(state * 255.0f);
+          id(g_dirty) = true;
   - platform: template
     id: out_hour_b
     type: float
     write_action:
-      - lambda: id(g_hour_b) = (int)(state * 255.0f);
+      - lambda: |-
+          id(g_hour_b) = (int)(state * 255.0f);
+          id(g_dirty) = true;
 
   - platform: template
     id: out_min_r
     type: float
     write_action:
-      - lambda: id(g_min_r) = (int)(state * 255.0f);
+      - lambda: |-
+          id(g_min_r) = (int)(state * 255.0f);
+          id(g_dirty) = true;
   - platform: template
     id: out_min_g
     type: float
     write_action:
-      - lambda: id(g_min_g) = (int)(state * 255.0f);
+      - lambda: |-
+          id(g_min_g) = (int)(state * 255.0f);
+          id(g_dirty) = true;
   - platform: template
     id: out_min_b
     type: float
     write_action:
-      - lambda: id(g_min_b) = (int)(state * 255.0f);
+      - lambda: |-
+          id(g_min_b) = (int)(state * 255.0f);
+          id(g_dirty) = true;
 
   - platform: template
     id: out_down_r
@@ -371,7 +403,7 @@ output:
     write_action:
       - lambda: id(g_down_b) = (int)(state * 255.0f);
 
-# ── Lights ────────────────────────────────────────────────────
+# ── Lights ────────────────────────────────────────────
 light:
 
   # Virtual RGB light → hour digit colour.
@@ -400,7 +432,8 @@ light:
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
-  # Physical clock digit strip — internal, HA does not control this directly.
+  # Physical clock digit strip.
+  # Marked internal — HA does not control this directly.
   # All rendering is done by the addressable_lambda effect below.
   # GPIO5 = D3 on XIAO ESP32-C3
   # 252 LEDs = 4 digits × 7 segments × 9 LEDs per segment
@@ -411,7 +444,7 @@ light:
     pin: GPIO5
     num_leds: 252
     type: GRB
-    variant: WS2812
+    variant: WS2812 
     method:
       type: esp32_rmt
       channel: 0
@@ -420,8 +453,8 @@ light:
     effects:
 
       # ── Clock Display ─────────────────────────────────────
-      # Updates every 250ms — fast enough for responsive colour picker
-      # changes while keeping RMT load low.
+      # Polls every 1s to catch overlay expiry; only writes to the
+      # LED strip (RMT) when g_dirty is set or the overlay just ended.
       #
       # Default: shows the current local time (HH MM).
       # When a display message has been received via MQTT it shows
@@ -442,8 +475,15 @@ light:
       #   mins  tens =  63 | mins  units =   0
       - addressable_lambda:
           name: "Clock Display"
-          update_interval: 250ms
+          update_interval: 1s
           lambda: |-
+            // Only redraw when something has changed
+            bool overlay_active = millis() < id(g_display_until_ms);
+            bool overlay_just_ended = id(g_display_was_active) && !overlay_active;
+            id(g_display_was_active) = overlay_active;
+            if (!id(g_dirty) && !overlay_just_ended) return;
+            id(g_dirty) = false;
+
             // Fill pixels [base+start .. base+start+len-1] with colour c
             auto seg = [&](int base, int start, int len, Color c) {
               for (int i = base + start; i < base + start + len; i++) {
@@ -479,7 +519,7 @@ light:
             it.all() = Color(0, 0, 0);
 
             if (millis() < id(g_display_until_ms)) {
-              // ── Show MQTT overlay value ──────────────────
+              // ── Show MQTT overlay value ──────────────
               Color col_v((uint8_t)(id(g_display_r)        * br),
                           (uint8_t)(id(g_display_g)        * br),
                           (uint8_t)(id(g_display_b)        * br));
@@ -505,7 +545,7 @@ light:
               }
 
             } else {
-              // ── Show current local time ──────────────────
+              // ── Show current local time ──────────────
               Color col_h((uint8_t)(id(g_hour_r) * br),
                           (uint8_t)(id(g_hour_g) * br),
                           (uint8_t)(id(g_hour_b) * br));
@@ -570,7 +610,7 @@ light:
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
-# ── Rainbow mode switch ───────────────────────────────────────
+# ── Rainbow mode switch ─────────────────────────────────
 switch:
   - platform: template
     name: "Rainbow Mode"
@@ -592,7 +632,7 @@ switch:
           id: clock_strip
           effect: "Clock Display"
 
-# ── Randomise colours button ──────────────────────────────────
+# ── Randomise colours button ────────────────────────────
 button:
   - platform: template
     name: "Randomise Colours"
