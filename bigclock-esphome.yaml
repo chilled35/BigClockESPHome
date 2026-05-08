@@ -36,9 +36,6 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   use_address: 192.168.0.39
-  # NONE prevents the radio sleeping between beacons, which eliminates
-  # the burst WiFi interrupts that corrupt RMT transmission on long LED chains.
-  power_save_mode: none
   ap:
     ssid: "${friendly_name} Setup"
     password: !secret fallback_password
