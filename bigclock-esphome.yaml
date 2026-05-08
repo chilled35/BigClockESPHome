@@ -400,9 +400,8 @@ light:
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
-  # Physical clock digit strip.
-  # Marked internal — HA does not control this directly.
-  # All rendering is done by the addressable_lambda effect below.
+  # Physical clock digit strip — bit_bang method mirrors Adafruit_NeoPixel:
+  # disables interrupts during transmission so WiFi cannot corrupt the frame.
   # GPIO5 = D3 on XIAO ESP32-C3
   # 252 LEDs = 4 digits × 7 segments × 9 LEDs per segment
   - platform: neopixelbus
@@ -414,8 +413,7 @@ light:
     type: GRB
     variant: WS2812
     method:
-      type: esp32_rmt
-      channel: 0
+      type: bit_bang
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
