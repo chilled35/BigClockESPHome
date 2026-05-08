@@ -298,6 +298,7 @@ sensor:
       - sliding_window_moving_average:
           window_size: 8
           send_every: 1
+      - delta: 0.05
     on_value:
       then:
         - lambda: |-
