@@ -23,7 +23,7 @@ esp32:
 
 # ── Logging ───────────────────────────────────────────────────
 logger:
-  level: DEBUG
+  level: WARN
   
 
 # ── OTA ───────────────────────────────────────────────────────
@@ -106,13 +106,17 @@ mqtt:
               return atoi(p);
             };
 
-            // Extract a quoted string field into a fixed buffer
+            // Extract a quoted string field into a fixed buffer.
+            // Handles optional whitespace after the colon (e.g. "key": "value").
             auto get_str = [](const char* j, const char* key, char* out, int n) -> bool {
               char search[32];
-              snprintf(search, sizeof(search), "\"%s\":\"", key);
+              snprintf(search, sizeof(search), "\"%s\":", key);
               const char* p = strstr(j, search);
               if (!p) return false;
               p += strlen(search);
+              while (*p == ' ') p++;  // skip optional whitespace
+              if (*p != '"') return false;
+              p++;  // skip opening quote
               int i = 0;
               while (*p && *p != '"' && i < n - 1) out[i++] = *p++;
               out[i] = 0;
@@ -369,12 +373,15 @@ light:
   # Virtual RGB light → hour digit colour.
   # HA shows this as a standard colour picker. Changes flow through
   # the template outputs above into the g_hour_r/g/b globals.
+  # gamma_correct: 0 — raw sRGB values passed straight to the outputs;
+  # the neopixelbus strip handles its own output curve.
   - platform: rgb
     name: "Hour Colour"
     id: hour_colour
     red: out_hour_r
     green: out_hour_g
     blue: out_hour_b
+    gamma_correct: 0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
@@ -385,6 +392,7 @@ light:
     red: out_min_r
     green: out_min_g
     blue: out_min_b
+    gamma_correct: 0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
@@ -554,6 +562,7 @@ light:
     red: out_down_r
     green: out_down_g
     blue: out_down_b
+    gamma_correct: 0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
