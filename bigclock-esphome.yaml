@@ -36,6 +36,10 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   use_address: 192.168.0.39
+  # NONE keeps the radio awake continuously, reducing the burst WiFi
+  # interrupts that can corrupt RMT transmission on long LED chains.
+  # NOTE: requires a clean power cycle after first OTA flash to take effect.
+  power_save_mode: none
   ap:
     ssid: "${friendly_name} Setup"
     password: !secret fallback_password
