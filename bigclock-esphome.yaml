@@ -311,6 +311,138 @@ globals:
     restore_value: no
     initial_value: '255'
 
+  # ── Preset colour storage ───────────────────────────
+  # Colours persist across reboots via flash preferences.
+  # Preset 1 — Classic (White / White)
+  - id: g_p1_hour_r
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p1_hour_g
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p1_hour_b
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p1_min_r
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p1_min_g
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p1_min_b
+    type: int
+    restore_value: yes
+    initial_value: '255'
+
+  # Preset 2 — Sunset (Orange / Red)
+  - id: g_p2_hour_r
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p2_hour_g
+    type: int
+    restore_value: yes
+    initial_value: '102'
+  - id: g_p2_hour_b
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_p2_min_r
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p2_min_g
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_p2_min_b
+    type: int
+    restore_value: yes
+    initial_value: '0'
+
+  # Preset 3 — Ocean (Cyan / Blue)
+  - id: g_p3_hour_r
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_p3_hour_g
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p3_hour_b
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p3_min_r
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_p3_min_g
+    type: int
+    restore_value: yes
+    initial_value: '102'
+  - id: g_p3_min_b
+    type: int
+    restore_value: yes
+    initial_value: '255'
+
+  # Preset 4 — Forest (Green / Lime)
+  - id: g_p4_hour_r
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_p4_hour_g
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p4_hour_b
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_p4_min_r
+    type: int
+    restore_value: yes
+    initial_value: '170'
+  - id: g_p4_min_g
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p4_min_b
+    type: int
+    restore_value: yes
+    initial_value: '0'
+
+  # Preset 5 — Candy (Pink / Purple)
+  - id: g_p5_hour_r
+    type: int
+    restore_value: yes
+    initial_value: '255'
+  - id: g_p5_hour_g
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_p5_hour_b
+    type: int
+    restore_value: yes
+    initial_value: '170'
+  - id: g_p5_min_r
+    type: int
+    restore_value: yes
+    initial_value: '170'
+  - id: g_p5_min_g
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: g_p5_min_b
+    type: int
+    restore_value: yes
+    initial_value: '255'
+
 # ── Light sensor (LDR) ────────────────────────────────
 # GPIO2 = A0 on XIAO ESP32-C3
 # Brighter room → higher ADC voltage → dimmer LEDs (avoids glare)
@@ -402,6 +534,162 @@ output:
     type: float
     write_action:
       - lambda: id(g_down_b) = (int)(state * 255.0f);
+
+  # ── Preset colour picker outputs ──────────────────────
+  - platform: template
+    id: out_p1_hour_r
+    type: float
+    write_action:
+      - lambda: id(g_p1_hour_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p1_hour_g
+    type: float
+    write_action:
+      - lambda: id(g_p1_hour_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p1_hour_b
+    type: float
+    write_action:
+      - lambda: id(g_p1_hour_b) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p1_min_r
+    type: float
+    write_action:
+      - lambda: id(g_p1_min_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p1_min_g
+    type: float
+    write_action:
+      - lambda: id(g_p1_min_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p1_min_b
+    type: float
+    write_action:
+      - lambda: id(g_p1_min_b) = (int)(state * 255.0f);
+
+  - platform: template
+    id: out_p2_hour_r
+    type: float
+    write_action:
+      - lambda: id(g_p2_hour_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p2_hour_g
+    type: float
+    write_action:
+      - lambda: id(g_p2_hour_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p2_hour_b
+    type: float
+    write_action:
+      - lambda: id(g_p2_hour_b) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p2_min_r
+    type: float
+    write_action:
+      - lambda: id(g_p2_min_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p2_min_g
+    type: float
+    write_action:
+      - lambda: id(g_p2_min_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p2_min_b
+    type: float
+    write_action:
+      - lambda: id(g_p2_min_b) = (int)(state * 255.0f);
+
+  - platform: template
+    id: out_p3_hour_r
+    type: float
+    write_action:
+      - lambda: id(g_p3_hour_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p3_hour_g
+    type: float
+    write_action:
+      - lambda: id(g_p3_hour_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p3_hour_b
+    type: float
+    write_action:
+      - lambda: id(g_p3_hour_b) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p3_min_r
+    type: float
+    write_action:
+      - lambda: id(g_p3_min_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p3_min_g
+    type: float
+    write_action:
+      - lambda: id(g_p3_min_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p3_min_b
+    type: float
+    write_action:
+      - lambda: id(g_p3_min_b) = (int)(state * 255.0f);
+
+  - platform: template
+    id: out_p4_hour_r
+    type: float
+    write_action:
+      - lambda: id(g_p4_hour_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p4_hour_g
+    type: float
+    write_action:
+      - lambda: id(g_p4_hour_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p4_hour_b
+    type: float
+    write_action:
+      - lambda: id(g_p4_hour_b) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p4_min_r
+    type: float
+    write_action:
+      - lambda: id(g_p4_min_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p4_min_g
+    type: float
+    write_action:
+      - lambda: id(g_p4_min_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p4_min_b
+    type: float
+    write_action:
+      - lambda: id(g_p4_min_b) = (int)(state * 255.0f);
+
+  - platform: template
+    id: out_p5_hour_r
+    type: float
+    write_action:
+      - lambda: id(g_p5_hour_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p5_hour_g
+    type: float
+    write_action:
+      - lambda: id(g_p5_hour_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p5_hour_b
+    type: float
+    write_action:
+      - lambda: id(g_p5_hour_b) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p5_min_r
+    type: float
+    write_action:
+      - lambda: id(g_p5_min_r) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p5_min_g
+    type: float
+    write_action:
+      - lambda: id(g_p5_min_g) = (int)(state * 255.0f);
+  - platform: template
+    id: out_p5_min_b
+    type: float
+    write_action:
+      - lambda: id(g_p5_min_b) = (int)(state * 255.0f);
 
 # ── Lights ────────────────────────────────────────────
 light:
@@ -610,6 +898,110 @@ light:
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
+  # ── Preset colour picker lights ─────────────────────────
+  # Virtual RGB lights — HA colour pickers for each preset slot.
+  # Changing these only updates the stored preset; use the Apply
+  # Preset N button to push the colours to the active display.
+  - platform: rgb
+    name: "Preset 1 Hour Colour"
+    id: p1_hour_colour
+    red: out_p1_hour_r
+    green: out_p1_hour_g
+    blue: out_p1_hour_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: rgb
+    name: "Preset 1 Min Colour"
+    id: p1_min_colour
+    red: out_p1_min_r
+    green: out_p1_min_g
+    blue: out_p1_min_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: rgb
+    name: "Preset 2 Hour Colour"
+    id: p2_hour_colour
+    red: out_p2_hour_r
+    green: out_p2_hour_g
+    blue: out_p2_hour_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: rgb
+    name: "Preset 2 Min Colour"
+    id: p2_min_colour
+    red: out_p2_min_r
+    green: out_p2_min_g
+    blue: out_p2_min_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: rgb
+    name: "Preset 3 Hour Colour"
+    id: p3_hour_colour
+    red: out_p3_hour_r
+    green: out_p3_hour_g
+    blue: out_p3_hour_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: rgb
+    name: "Preset 3 Min Colour"
+    id: p3_min_colour
+    red: out_p3_min_r
+    green: out_p3_min_g
+    blue: out_p3_min_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: rgb
+    name: "Preset 4 Hour Colour"
+    id: p4_hour_colour
+    red: out_p4_hour_r
+    green: out_p4_hour_g
+    blue: out_p4_hour_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: rgb
+    name: "Preset 4 Min Colour"
+    id: p4_min_colour
+    red: out_p4_min_r
+    green: out_p4_min_g
+    blue: out_p4_min_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: rgb
+    name: "Preset 5 Hour Colour"
+    id: p5_hour_colour
+    red: out_p5_hour_r
+    green: out_p5_hour_g
+    blue: out_p5_hour_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: rgb
+    name: "Preset 5 Min Colour"
+    id: p5_min_colour
+    red: out_p5_min_r
+    green: out_p5_min_g
+    blue: out_p5_min_b
+    gamma_correct: 0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+
 # ── Rainbow mode switch ─────────────────────────────────
 switch:
   - platform: template
@@ -651,3 +1043,111 @@ button:
           auto cm = id(min_colour).turn_on();
           cm.set_rgb(id(g_min_r)/255.0f, id(g_min_g)/255.0f, id(g_min_b)/255.0f);
           cm.perform();
+
+  # ── Preset apply buttons ──────────────────────────────
+  - platform: template
+    name: "Apply Preset 1"
+    on_press:
+      - lambda: |-
+          id(g_hour_r) = id(g_p1_hour_r); id(g_hour_g) = id(g_p1_hour_g); id(g_hour_b) = id(g_p1_hour_b);
+          id(g_min_r)  = id(g_p1_min_r);  id(g_min_g)  = id(g_p1_min_g);  id(g_min_b)  = id(g_p1_min_b);
+          id(g_dirty) = true;
+          auto ch = id(hour_colour).turn_on();
+          ch.set_rgb(id(g_hour_r)/255.0f, id(g_hour_g)/255.0f, id(g_hour_b)/255.0f); ch.perform();
+          auto cm = id(min_colour).turn_on();
+          cm.set_rgb(id(g_min_r)/255.0f, id(g_min_g)/255.0f, id(g_min_b)/255.0f); cm.perform();
+
+  - platform: template
+    name: "Apply Preset 2"
+    on_press:
+      - lambda: |-
+          id(g_hour_r) = id(g_p2_hour_r); id(g_hour_g) = id(g_p2_hour_g); id(g_hour_b) = id(g_p2_hour_b);
+          id(g_min_r)  = id(g_p2_min_r);  id(g_min_g)  = id(g_p2_min_g);  id(g_min_b)  = id(g_p2_min_b);
+          id(g_dirty) = true;
+          auto ch = id(hour_colour).turn_on();
+          ch.set_rgb(id(g_hour_r)/255.0f, id(g_hour_g)/255.0f, id(g_hour_b)/255.0f); ch.perform();
+          auto cm = id(min_colour).turn_on();
+          cm.set_rgb(id(g_min_r)/255.0f, id(g_min_g)/255.0f, id(g_min_b)/255.0f); cm.perform();
+
+  - platform: template
+    name: "Apply Preset 3"
+    on_press:
+      - lambda: |-
+          id(g_hour_r) = id(g_p3_hour_r); id(g_hour_g) = id(g_p3_hour_g); id(g_hour_b) = id(g_p3_hour_b);
+          id(g_min_r)  = id(g_p3_min_r);  id(g_min_g)  = id(g_p3_min_g);  id(g_min_b)  = id(g_p3_min_b);
+          id(g_dirty) = true;
+          auto ch = id(hour_colour).turn_on();
+          ch.set_rgb(id(g_hour_r)/255.0f, id(g_hour_g)/255.0f, id(g_hour_b)/255.0f); ch.perform();
+          auto cm = id(min_colour).turn_on();
+          cm.set_rgb(id(g_min_r)/255.0f, id(g_min_g)/255.0f, id(g_min_b)/255.0f); cm.perform();
+
+  - platform: template
+    name: "Apply Preset 4"
+    on_press:
+      - lambda: |-
+          id(g_hour_r) = id(g_p4_hour_r); id(g_hour_g) = id(g_p4_hour_g); id(g_hour_b) = id(g_p4_hour_b);
+          id(g_min_r)  = id(g_p4_min_r);  id(g_min_g)  = id(g_p4_min_g);  id(g_min_b)  = id(g_p4_min_b);
+          id(g_dirty) = true;
+          auto ch = id(hour_colour).turn_on();
+          ch.set_rgb(id(g_hour_r)/255.0f, id(g_hour_g)/255.0f, id(g_hour_b)/255.0f); ch.perform();
+          auto cm = id(min_colour).turn_on();
+          cm.set_rgb(id(g_min_r)/255.0f, id(g_min_g)/255.0f, id(g_min_b)/255.0f); cm.perform();
+
+  - platform: template
+    name: "Apply Preset 5"
+    on_press:
+      - lambda: |-
+          id(g_hour_r) = id(g_p5_hour_r); id(g_hour_g) = id(g_p5_hour_g); id(g_hour_b) = id(g_p5_hour_b);
+          id(g_min_r)  = id(g_p5_min_r);  id(g_min_g)  = id(g_p5_min_g);  id(g_min_b)  = id(g_p5_min_b);
+          id(g_dirty) = true;
+          auto ch = id(hour_colour).turn_on();
+          ch.set_rgb(id(g_hour_r)/255.0f, id(g_hour_g)/255.0f, id(g_hour_b)/255.0f); ch.perform();
+          auto cm = id(min_colour).turn_on();
+          cm.set_rgb(id(g_min_r)/255.0f, id(g_min_g)/255.0f, id(g_min_b)/255.0f); cm.perform();
+
+# ── Preset names (editable text) ──────────────────────────
+text:
+  - platform: template
+    name: "Preset 1 Name"
+    id: preset_1_name
+    optimistic: true
+    initial_value: "Classic"
+    min_length: 1
+    max_length: 20
+    mode: text
+
+  - platform: template
+    name: "Preset 2 Name"
+    id: preset_2_name
+    optimistic: true
+    initial_value: "Sunset"
+    min_length: 1
+    max_length: 20
+    mode: text
+
+  - platform: template
+    name: "Preset 3 Name"
+    id: preset_3_name
+    optimistic: true
+    initial_value: "Ocean"
+    min_length: 1
+    max_length: 20
+    mode: text
+
+  - platform: template
+    name: "Preset 4 Name"
+    id: preset_4_name
+    optimistic: true
+    initial_value: "Forest"
+    min_length: 1
+    max_length: 20
+    mode: text
+
+  - platform: template
+    name: "Preset 5 Name"
+    id: preset_5_name
+    optimistic: true
+    initial_value: "Candy"
+    min_length: 1
+    max_length: 20
+    mode: text
