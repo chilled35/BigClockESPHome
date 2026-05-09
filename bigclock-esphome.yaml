@@ -734,7 +734,7 @@ light:
     num_leds: 252
     rgb_order: GRB
     chipset: WS2812
-    rmt_symbols: 64
+    rmt_symbols: 48
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
@@ -867,7 +867,7 @@ light:
     num_leds: 14
     rgb_order: GRB
     chipset: WS2812
-    rmt_symbols: 64
+    rmt_symbols: 48
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
