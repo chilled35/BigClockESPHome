@@ -699,7 +699,7 @@ light:
   # HA shows this as a standard colour picker. Changes flow through
   # the template outputs above into the g_hour_r/g/b globals.
   # gamma_correct: 0 — raw sRGB values passed straight to the outputs;
-  # the neopixelbus strip handles its own output curve.
+  # the LED strip handles its own output curve.
   - platform: rgb
     name: "Hour Colour"
     id: hour_colour
@@ -732,7 +732,6 @@ light:
     internal: true
     pin: GPIO5
     num_leds: 252
-    rmt_channel: 0
     rgb_order: GRB
     chipset: WS2812
     default_transition_length: 0s
@@ -865,7 +864,6 @@ light:
     internal: true
     pin: GPIO4
     num_leds: 14
-    rmt_channel: 1
     rgb_order: GRB
     chipset: WS2812
     default_transition_length: 0s
