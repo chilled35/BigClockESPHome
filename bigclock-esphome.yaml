@@ -21,17 +21,17 @@ esp32:
   framework:
     type: arduino
 
-# ── Logging ─────────────────────────────────────────────
+# ── Logging ───────────────────────────────────────────────────
 logger:
   level: WARN
   
 
-# ── OTA ─────────────────────────────────────────────
+# ── OTA ───────────────────────────────────────────────────────
 ota:
   - platform: esphome
     password: !secret ota_password
 
-# ── WiFi ────────────────────────────────────────────
+# ── WiFi ──────────────────────────────────────────────────────
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
@@ -40,27 +40,28 @@ wifi:
   # interrupts that can corrupt RMT transmission on long LED chains.
   # NOTE: requires a clean power cycle after first OTA flash to take effect.
   power_save_mode: none
+  reboot_timeout: 0s
   ap:
     ssid: "${friendly_name} Setup"
     password: !secret fallback_password
 
 captive_portal:
 
-# ── Home Assistant native API ─────────────────────────
+# ── Home Assistant native API ─────────────────────────────────
 api:
   encryption:
     key: !secret api_key
 
-# ── Web UI ────────────────────────────────────────────
+# ── Web UI ────────────────────────────────────────────────────
 # Accessible at http://bigclock.local after first flash
 web_server:
   port: 80
 
-# ── MQTT ────────────────────────────────────────────
+# ── MQTT ──────────────────────────────────────────────────────
 # ESPHome publishes MQTT discovery automatically — all entities
 # appear in HA via both the native API and MQTT.
 #
-# ── Display messages ──────────────────────────────
+# ── Display messages ──────────────────────────────────────────
 # Publish a JSON payload to  bigclock/display  to show a value
 # on the clock for 5 seconds, then it returns to showing the time.
 #
@@ -179,7 +180,7 @@ mqtt:
             id(g_display_until_ms) = millis() + 5000;
             id(g_dirty) = true;
 
-# ── Time ──────────────────────────────────────────────
+# ── Time ──────────────────────────────────────────────────────
 # Syncs from HA over the local API — fast, no internet needed.
 # Europe/London handles BST/GMT transitions automatically.
 time:
@@ -192,7 +193,7 @@ time:
         then:
           - lambda: id(g_dirty) = true;
 
-# ── Global state ──────────────────────────────────────────
+# ── Global state ──────────────────────────────────────────────
 globals:
   # Hour-digit colour (0–255 per channel).
   # Written by the virtual hour_colour light entity when HA changes colour.
@@ -223,7 +224,7 @@ globals:
     restore_value: no
     initial_value: '0'
 
-  # ── Display overlay state ──────────────────────────
+  # ── Display overlay state ──────────────────────────────────
   # When millis() < g_display_until_ms the clock shows the overlay
   # value instead of the time. Each MQTT message sets a fresh 5 s window.
 
@@ -311,7 +312,7 @@ globals:
     restore_value: no
     initial_value: '255'
 
-  # ── Preset colour storage ───────────────────────────
+  # ── Preset colour storage ───────────────────────────────────
   # Colours persist across reboots via flash preferences.
   # Preset 1 — Classic (White / White)
   - id: g_p1_hour_r
@@ -443,7 +444,7 @@ globals:
     restore_value: yes
     initial_value: '255'
 
-# ── Light sensor (LDR) ────────────────────────────────
+# ── Light sensor (LDR) ────────────────────────────────────────
 # GPIO2 = A0 on XIAO ESP32-C3
 # Brighter room → higher ADC voltage → dimmer LEDs (avoids glare)
 sensor:
@@ -469,7 +470,7 @@ sensor:
             id(g_brightness) = br;
             id(g_dirty) = true;
 
-# ── Virtual outputs for colour storage ────────────────────
+# ── Virtual outputs for colour storage ────────────────────────
 # ESPHome's rgb light platform writes float values (0.0–1.0) to
 # these outputs when HA changes the hour or minute colour.
 # We store them as 0–255 integers so the rendering lambda can use
@@ -535,7 +536,7 @@ output:
     write_action:
       - lambda: id(g_down_b) = (int)(state * 255.0f);
 
-  # ── Preset colour picker outputs ──────────────────────
+  # ── Preset colour picker outputs ────────────────────────────
   - platform: template
     id: out_p1_hour_r
     type: float
@@ -691,7 +692,7 @@ output:
     write_action:
       - lambda: id(g_p5_min_b) = (int)(state * 255.0f);
 
-# ── Lights ────────────────────────────────────────────
+# ── Lights ────────────────────────────────────────────────────
 light:
 
   # Virtual RGB light → hour digit colour.
@@ -807,7 +808,7 @@ light:
             it.all() = Color(0, 0, 0);
 
             if (millis() < id(g_display_until_ms)) {
-              // ── Show MQTT overlay value ──────────────
+              // ── Show MQTT overlay value ──────────────────
               Color col_v((uint8_t)(id(g_display_r)        * br),
                           (uint8_t)(id(g_display_g)        * br),
                           (uint8_t)(id(g_display_b)        * br));
@@ -833,7 +834,7 @@ light:
               }
 
             } else {
-              // ── Show current local time ──────────────
+              // ── Show current local time ──────────────────
               Color col_h((uint8_t)(id(g_hour_r) * br),
                           (uint8_t)(id(g_hour_g) * br),
                           (uint8_t)(id(g_hour_b) * br));
@@ -898,7 +899,7 @@ light:
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
-  # ── Preset colour picker lights ─────────────────────────
+  # ── Preset colour picker lights ─────────────────────────────
   # Virtual RGB lights — HA colour pickers for each preset slot.
   # Changing these only updates the stored preset; use the Apply
   # Preset N button to push the colours to the active display.
@@ -1002,7 +1003,7 @@ light:
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
 
-# ── Rainbow mode switch ─────────────────────────────────
+# ── Rainbow mode switch ───────────────────────────────────────
 switch:
   - platform: template
     name: "Rainbow Mode"
@@ -1024,7 +1025,7 @@ switch:
           id: clock_strip
           effect: "Clock Display"
 
-# ── Randomise colours button ────────────────────────────
+# ── Randomise colours button ──────────────────────────────────
 button:
   - platform: template
     name: "Randomise Colours"
@@ -1044,7 +1045,7 @@ button:
           cm.set_rgb(id(g_min_r)/255.0f, id(g_min_g)/255.0f, id(g_min_b)/255.0f);
           cm.perform();
 
-  # ── Preset apply buttons ──────────────────────────────
+  # ── Preset apply buttons ────────────────────────────────────
   - platform: template
     name: "Apply Preset 1"
     on_press:
@@ -1105,7 +1106,7 @@ button:
           auto cm = id(min_colour).turn_on();
           cm.set_rgb(id(g_min_r)/255.0f, id(g_min_g)/255.0f, id(g_min_b)/255.0f); cm.perform();
 
-# ── Preset names (editable text) ──────────────────────────
+# ── Preset names (editable text) ──────────────────────────────
 text:
   - platform: template
     name: "Preset 1 Name"
