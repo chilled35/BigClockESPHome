@@ -726,17 +726,15 @@ light:
   # All rendering is done by the addressable_lambda effect below.
   # GPIO5 = D3 on XIAO ESP32-C3
   # 252 LEDs = 4 digits × 7 segments × 9 LEDs per segment
-  - platform: neopixelbus
+  - platform: esp32_rmt_led_strip
     id: clock_strip
     name: "Clock Strip"
     internal: true
     pin: GPIO5
     num_leds: 252
-    type: GRB
-    variant: WS2812 
-    method:
-      type: esp32_rmt
-      channel: 0
+    rmt_channel: 0
+    rgb_order: GRB
+    chipset: WS2812
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
@@ -861,17 +859,15 @@ light:
   # Physical downlight strip — internal, driven by the Downlight Display effect
   # which applies LDR ambient brightness scaling (g_brightness).
   # GPIO4 = D2 on XIAO ESP32-C3 | 14 LEDs
-  - platform: neopixelbus
+  - platform: esp32_rmt_led_strip
     id: down_strip
     name: "Downlight Strip"
     internal: true
     pin: GPIO4
     num_leds: 14
-    type: GRB
-    variant: WS2812
-    method:
-      type: esp32_rmt
-      channel: 1
+    rmt_channel: 1
+    rgb_order: GRB
+    chipset: WS2812
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
