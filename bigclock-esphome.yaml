@@ -77,9 +77,9 @@ esphome:
                 value: 'true'
 
 esp32:
-  board: seeed_xiao_esp32c3
+  board: waveshare_esp32s3_zero
   framework:
-    type: esp-idf
+    type: arduino
 
 # ── Logging ───────────────────────────────────────────────────
 logger:
@@ -792,15 +792,16 @@ light:
   # All rendering is done by the addressable_lambda effect below.
   # GPIO4 = D3 on XIAO ESP32-C3
   # 252 LEDs = 4 digits × 7 segments × 9 LEDs per segment
-  - platform: esp32_rmt_led_strip
+  - platform: neopixelbus
     id: clock_strip
     name: "Clock Strip"
     internal: true
     pin: GPIO4
     num_leds: 252
-    rgb_order: GRB
-    chipset: WS2812
-    rmt_symbols: 48
+    type: GRB
+    variant: WS2812
+    method:
+      type: esp32_rmt
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
@@ -925,15 +926,16 @@ light:
   # Physical downlight strip — internal, driven by the Downlight Display effect
   # which applies LDR ambient brightness scaling (g_brightness).
   # GPIO5 = D2 on XIAO ESP32-C3 | 14 LEDs
-  - platform: esp32_rmt_led_strip
+  - platform: neopixelbus
     id: down_strip
     name: "Downlight Strip"
     internal: true
     pin: GPIO5
     num_leds: 14
-    rgb_order: GRB
-    chipset: WS2812
-    rmt_symbols: 48
+    type: GRB
+    variant: WS2812
+    method:
+      type: esp32_rmt
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
