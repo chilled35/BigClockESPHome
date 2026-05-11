@@ -77,7 +77,7 @@ esphome:
                 value: 'true'
 
 esp32:
-  board: waveshare_esp32s3_zero
+  board: esp32-s3-devkitc-1
   framework:
     type: arduino
 
