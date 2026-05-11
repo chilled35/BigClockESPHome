@@ -803,6 +803,7 @@ light:
     variant: WS2812
     method:
       type: esp32_rmt
+      channel: 2
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
@@ -937,6 +938,7 @@ light:
     variant: WS2812
     method:
       type: esp32_rmt
+      channel: 3
     default_transition_length: 0s
     restore_mode: ALWAYS_OFF
     effects:
