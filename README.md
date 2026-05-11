@@ -1,20 +1,32 @@
 # Big Clock — ESPHome
 
-ESPHome firmware for the Big NTP Clock, replacing the original native Arduino/PlatformIO firmware. Same hardware, same features — but now managed from the ESPHome dashboard alongside all your other ESPHome devices.
+ESPHome firmware for the Big NTP Clock, replacing the original native Arduino/PlatformIO firmware. Same hardware (upgraded MCU), same features — but now managed from the ESPHome dashboard alongside all your other ESPHome devices.
 
 **Original native firmware:** [chilled35/BigClock](https://github.com/chilled35/BigClock)
 
 ## Hardware
 
-Identical to the original — no changes needed.
-
 | Component | Detail |
 |---|---|
-| Microcontroller | Seeed Studio XIAO ESP32-C3 |
-| Clock digit strip | 252 LEDs, WS2812 GRB, GPIO5 (D3) |
-| Downlight strip | 14 LEDs, WS2812 GRB, GPIO4 (D2) |
+| Microcontroller | Waveshare ESP32-S3-Zero (clone) |
+| Clock digit strip | 252 LEDs, WS2812 GRB, GPIO4 |
+| Downlight strip | 14 LEDs, WS2812 GRB, GPIO5 |
 | Light sensor | LDR on GPIO2 (A0, ADC1) |
 | PSU | Meanwell 60W 5V |
+
+> **Note:** The original build used a Seeed Studio XIAO ESP32-C3. The ESP32-S3-Zero is a drop-in upgrade — same physical pin positions on the board, same GPIO numbers, no rewiring required.
+
+## ESPHome config key settings
+
+| Setting | Value | Reason |
+|---|---|---|
+| `board` | `esp32-s3-devkitc-1` | Closest known ESPHome board ID |
+| `flash_size` | `4MB` | Waveshare ESP32-S3-Zero has 4MB (devkitc-1 defaults to 8MB — mismatch causes boot loop) |
+| `framework` | `arduino` | ESP32-S3 is dual-core; WiFi runs on core 0, app on core 1 — no RMT/WiFi conflicts |
+| LED method | `neopixelbus / esp32_rmt` | Reliable hardware-timed output |
+| RMT channels | clock=2, down=3 | Channels 0+1 are pre-claimed by the devkitc-1 board init |
+| `power_save_mode` | `none` | Keeps WiFi radio awake continuously |
+| `reboot_timeout` | `0s` | Device retries WiFi indefinitely without rebooting |
 
 ## What changed vs the native firmware
 
@@ -27,10 +39,13 @@ Identical to the original — no changes needed.
 | Colour control | Custom web UI at `/` and `/fx` | HA colour pickers (RGB light entities) |
 | Credentials | Hardcoded in `main.cpp` | `secrets.yaml` (gitignored) |
 | Config | Recompile to change anything | Edit YAML, flash OTA |
+| Colour presets | None | 5 named presets with colour pickers + apply buttons |
 
 ## Home Assistant entities
 
 After adding the device, HA will automatically show these under **Settings → Devices → Big Clock**:
+
+### Display
 
 | Entity | Type | Description |
 |---|---|---|
@@ -40,6 +55,29 @@ After adding the device, HA will automatically show these under **Settings → D
 | Rainbow Mode | Switch | Toggle rainbow wave animation |
 | Ambient Light | Sensor | Raw LDR voltage (for diagnostics) |
 | Randomise Colours | Button | Pick random hour + minute colours |
+
+### Presets
+
+5 named colour presets are built in. Each preset stores independent hour and minute colours.
+
+| Entity | Type | Description |
+|---|---|---|
+| Preset 1–5 Hour Colour | Light (RGB) | Edit the hour digit colour for this preset |
+| Preset 1–5 Min Colour | Light (RGB) | Edit the minute digit colour for this preset |
+| Apply Preset 1–5 | Button | Push the preset colours to the active display |
+| Preset 1–5 Name | Text | Editable label shown in the HA device page |
+
+**Default preset colours:**
+
+| Preset | Hour | Minute |
+|---|---|---|
+| 1 — Classic | White | White |
+| 2 — Sunset | Orange `#FF6600` | Red `#FF0000` |
+| 3 — Ocean | Cyan `#00FFFF` | Blue `#0066FF` |
+| 4 — Forest | Green `#00FF00` | Lime `#AAFF00` |
+| 5 — Candy | Pink `#FF00AA` | Purple `#AA00FF` |
+
+Preset colours are seeded on first boot only — editing a preset in HA persists across reboots.
 
 ## Setup
 
@@ -68,19 +106,19 @@ Open ESPHome → **+ New device** → **Skip** → paste or upload `bigclock-esp
 
 The first flash must be over USB — OTA isn't available until the firmware is running.
 
+Connect the ESP32-S3-Zero via USB-C and flash from the ESPHome dashboard, or:
+
 ```bash
 esphome run bigclock-esphome.yaml
 ```
-
-Connect the XIAO via USB-C. ESPHome will compile, detect the port, and flash automatically.
 
 ### 5. Subsequent updates (OTA)
 
+Click **Install → Wirelessly** in the ESPHome dashboard, or:
+
 ```bash
 esphome run bigclock-esphome.yaml
 ```
-
-Or click **Install → Wirelessly** in the ESPHome dashboard.
 
 ---
 
@@ -150,8 +188,6 @@ actions:
          "color": "#FFFF00"}
 ```
 
-The clock shows hot tub temp for 5 s, then solar watts for 5 s, then returns to the time. Add more `mqtt.publish` + `delay` pairs to show additional values.
-
 ### Cancel early
 
 Send `{"value": -1}` to immediately clear any active overlay and return to the clock:
@@ -195,12 +231,10 @@ Digit pixel bases: `hours-tens=189`, `hours-units=126`, `mins-tens=63`, `mins-un
 
 ## Colour persistence
 
-ESPHome restores the last known state of the Hour Colour and Minute Colour light entities on reboot (`restore_mode: RESTORE_DEFAULT_ON`). Colours survive power cycles without any extra flash storage code.
+ESPHome restores the last known state of all colour light entities on reboot (`restore_mode: RESTORE_DEFAULT_ON`). Hour colour, minute colour, downlight colour, and all preset colours survive power cycles.
 
 ## Extending
 
 **Add more display formats:** Extend `g_display_format` with new integer values and add corresponding rendering branches in the `Clock Display` lambda.
 
 **Trigger from non-MQTT sources:** Any ESPHome action can set `g_display_value`, `g_display_format`, `g_display_r/g/b`, and `g_display_until_ms` directly via a `globals.set` / `lambda` action — no MQTT required.
-
-**Presets:** Create HA scenes that set Hour Colour and Minute Colour together, or use the Randomise button for instant variety.
