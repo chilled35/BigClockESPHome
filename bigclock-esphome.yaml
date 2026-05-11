@@ -35,7 +35,7 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  use_address: 192.168.0.39
+  use_address: 192.168.0.92
   # NONE keeps the radio awake continuously, reducing the burst WiFi
   # interrupts that can corrupt RMT transmission on long LED chains.
   # NOTE: requires a clean power cycle after first OTA flash to take effect.
@@ -724,13 +724,13 @@ light:
   # Physical clock digit strip.
   # Marked internal — HA does not control this directly.
   # All rendering is done by the addressable_lambda effect below.
-  # GPIO5 = D3 on XIAO ESP32-C3
+  # GPIO4 = D3 on XIAO ESP32-C3
   # 252 LEDs = 4 digits × 7 segments × 9 LEDs per segment
   - platform: esp32_rmt_led_strip
     id: clock_strip
     name: "Clock Strip"
     internal: true
-    pin: GPIO5
+    pin: GPIO4
     num_leds: 252
     rgb_order: GRB
     chipset: WS2812
@@ -858,12 +858,12 @@ light:
 
   # Physical downlight strip — internal, driven by the Downlight Display effect
   # which applies LDR ambient brightness scaling (g_brightness).
-  # GPIO4 = D2 on XIAO ESP32-C3 | 14 LEDs
+  # GPIO5 = D2 on XIAO ESP32-C3 | 14 LEDs
   - platform: esp32_rmt_led_strip
     id: down_strip
     name: "Downlight Strip"
     internal: true
-    pin: GPIO4
+    pin: GPIO5
     num_leds: 14
     rgb_order: GRB
     chipset: WS2812
