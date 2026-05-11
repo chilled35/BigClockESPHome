@@ -15,6 +15,66 @@ esphome:
       - light.turn_on:
           id: down_strip
           effect: "Downlight Display"
+      # On first boot only: seed preset colour pickers with their default colours.
+      # After this runs, g_presets_initialized is saved to flash so user edits
+      # are never overwritten on subsequent reboots.
+      - if:
+          condition:
+            lambda: return !id(g_presets_initialized);
+          then:
+            - light.turn_on:  # Preset 1 — Classic: White / White
+                id: p1_hour_colour
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+            - light.turn_on:
+                id: p1_min_colour
+                red: 1.0
+                green: 1.0
+                blue: 1.0
+            - light.turn_on:  # Preset 2 — Sunset: Orange / Red
+                id: p2_hour_colour
+                red: 1.0
+                green: 0.4
+                blue: 0.0
+            - light.turn_on:
+                id: p2_min_colour
+                red: 1.0
+                green: 0.0
+                blue: 0.0
+            - light.turn_on:  # Preset 3 — Ocean: Cyan / Blue
+                id: p3_hour_colour
+                red: 0.0
+                green: 1.0
+                blue: 1.0
+            - light.turn_on:
+                id: p3_min_colour
+                red: 0.0
+                green: 0.4
+                blue: 1.0
+            - light.turn_on:  # Preset 4 — Forest: Green / Lime
+                id: p4_hour_colour
+                red: 0.0
+                green: 1.0
+                blue: 0.0
+            - light.turn_on:
+                id: p4_min_colour
+                red: 0.667
+                green: 1.0
+                blue: 0.0
+            - light.turn_on:  # Preset 5 — Candy: Pink / Purple
+                id: p5_hour_colour
+                red: 1.0
+                green: 0.0
+                blue: 0.667
+            - light.turn_on:
+                id: p5_min_colour
+                red: 0.667
+                green: 0.0
+                blue: 1.0
+            - globals.set:
+                id: g_presets_initialized
+                value: 'true'
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -311,6 +371,12 @@ globals:
     type: int
     restore_value: no
     initial_value: '255'
+
+  # Set true after first-boot preset initialisation so user edits persist across reboots
+  - id: g_presets_initialized
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
 
   # ── Preset colour storage ───────────────────────────────────
   # Colours persist across reboots via flash preferences.
